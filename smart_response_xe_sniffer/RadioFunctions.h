@@ -117,6 +117,47 @@ uint8_t rfChannel(uint8_t channel)
 	return 1;
 }
 
+// This function will set promiscuous mode
+uint8_t rfPromisc()
+{
+	// Transceiver Pin Register -- TRXPR.
+	// This register can be used to reset the transceiver, without
+	// resetting the MCU.
+	TRXPR |= (1<<TRXRST);   // TRXRST = 1 (Reset state, resets all registers)
+
+	// Transceiver Interrupt Enable Mask - IRQ_MASK
+	// This register disables/enables individual radio interrupts.
+	// First, we'll disable IRQ and clear any pending IRQ's
+	IRQ_MASK = 0;  // Disable all IRQs
+
+	// Transceiver State Control Register -- TRX_STATE
+	// This regiseter controls the states of the radio.
+	// First, we'll set it to the TRX_OFF state.
+	TRX_STATE = (TRX_STATE & 0xE0) | TRX_OFF;  // Set to TRX_OFF state
+	delay(1);
+
+	// Transceiver Status Register -- TRX_STATUS
+	// This read-only register contains the present state of the radio transceiver.
+	// After telling it to go to the TRX_OFF state, we'll make sure it's actually
+	// there.
+	if ((TRX_STATUS & 0x1F) != TRX_OFF) // Check to make sure state is correct
+	return 0;	// Error, TRX isn't off
+
+	// Enable RX start/end
+	IRQ_MASK = (1<<RX_START_EN) | (1<<RX_END_EN);
+	
+	// set up promiscuous mode
+	RX_SAFE_MODE = 0;//1: enable frame protection
+	AACK_PROM_MODE = 1;//1: Enable promiscuous mode
+	AACK_DIS_ACK = 1;//1: Disable generation of acknowledgment
+	//AACK_FVN_MODE = 0x11;//0x11 : acknowledges all frames, independent of the FCF frame version number
+	// Finally, we'll enter into the RX_ON state. Now waiting for radio RX's, unless
+	// we go into a transmitting state.
+	TRX_STATE = (TRX_STATE & 0xE0) | RX_ON; // Default to receiver
+
+	return 1;
+}
+
 // This function sends a string of characters out of the radio.
 // Given a string, it'll format a frame, and send it out.
 void rfPrint(String toPrint)
